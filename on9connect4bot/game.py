@@ -1,6 +1,6 @@
 import itertools
 
-from constants import BLUE_EMOJI, RED_EMOJI, WHITE_EMOJI
+from .constants import BLUE_EMOJI, RED_EMOJI, WHITE_EMOJI
 
 
 class Game:

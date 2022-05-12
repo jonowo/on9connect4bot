@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import time
@@ -10,9 +11,9 @@ from telegram.constants import ParseMode
 from telegram.ext import (ApplicationBuilder, CallbackContext, CallbackQueryHandler,
                           CommandHandler, Defaults, InlineQueryHandler)
 
-from constants import BLUE_EMOJI, HANDSHAKE_EMOJI, RED_EMOJI, TROPHY_EMOJI
-from game import Game
-from name_store import NameStore
+from .constants import BLUE_EMOJI, HANDSHAKE_EMOJI, RED_EMOJI, TROPHY_EMOJI
+from .game import Game
+from .name_store import NameStore
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -20,7 +21,7 @@ logging.basicConfig(
 )
 
 load_dotenv()
-name_store = NameStore("name_store.json")
+name_store = NameStore("../name_store.json")
 
 
 async def cmd_start(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
@@ -98,8 +99,6 @@ async def callback_query_handler(update: Update, context: CallbackContext.DEFAUL
         await query.answer()
         return
 
-    await query.answer()
-
     header = [
         f"{BLUE_EMOJI} {name_store.get(game.player_ids[0])}",
         f"{RED_EMOJI} {name_store.get(game.player_ids[1])}"
@@ -130,7 +129,10 @@ async def callback_query_handler(update: Update, context: CallbackContext.DEFAUL
         "",
         str(game)
     ])
-    await query.edit_message_text(text=text, reply_markup=reply_markup)
+    await asyncio.gather(
+        query.answer(),
+        query.edit_message_text(text=text, reply_markup=reply_markup)
+    )
 
 
 def main():
