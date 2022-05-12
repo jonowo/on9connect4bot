@@ -1,15 +1,18 @@
 import logging
 import os
+import time
 from uuid import uuid4
 
 from dotenv import load_dotenv
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle,
                       InputTextMessageContent, Update)
+from telegram.constants import ParseMode
 from telegram.ext import (ApplicationBuilder, CallbackContext, CallbackQueryHandler,
-                          CommandHandler, InlineQueryHandler)
+                          CommandHandler, Defaults, InlineQueryHandler)
 
 from constants import BLUE_EMOJI, HANDSHAKE_EMOJI, RED_EMOJI, TROPHY_EMOJI
 from game import Game
+from name_store import NameStore
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -17,26 +20,41 @@ logging.basicConfig(
 )
 
 load_dotenv()
-
-USER_ID_TO_NAME = {}
+name_store = NameStore("name_store.json")
 
 
 async def cmd_start(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Hi"
+    await update.message.reply_text(
+        "Hi! Start a game of Connect 4 with a friend.",
+        reply_markup=InlineKeyboardMarkup.from_button(
+            InlineKeyboardButton("Select chat", switch_inline_query="")
+        )
     )
 
 
+async def cmd_help(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "Start a game by typing my name <code>@on9connect4bot</code> in any chat.\n\n"
+        "Contact my owner <a href='tg://user?id=463998526'>Jono</a> to report bugs.\n"
+        "Source code: <a href='https://github.com/jonowo/on9connect4bot'>jonowo/on9connect4bot</a>"
+    )
+
+
+async def cmd_ping(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+    t = time.time()
+    msg = await update.message.reply_text("Pong!")
+    await msg.edit_text(f"Pong! <code>{time.time() - t:.3f}s</code>")
+
+
 async def inline_query_handler(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
-    USER_ID_TO_NAME[update.effective_user.id] = update.effective_user.full_name
+    name_store.set(update.effective_user.id, update.effective_user.full_name)
     results = [
         InlineQueryResultArticle(
             id=str(uuid4()),
             title="Play Connect 4",
             input_message_content=InputTextMessageContent(
                 "Play Connect 4\n"
-                f"{BLUE_EMOJI} {USER_ID_TO_NAME[update.effective_user.id]}\n"
+                f"{BLUE_EMOJI} {name_store.get(update.effective_user.id)}\n"
                 f"{RED_EMOJI} Waiting for opponent\n"
                 "Connect 4 of your tokens in a row to win."
             ),
@@ -46,7 +64,7 @@ async def inline_query_handler(update: Update, context: CallbackContext.DEFAULT_
             description=f"You play as {BLUE_EMOJI}"
         )
     ]
-    await update.inline_query.answer(results)
+    await update.inline_query.answer(results, is_personal=True)
 
 
 async def callback_query_handler(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
@@ -54,7 +72,7 @@ async def callback_query_handler(update: Update, context: CallbackContext.DEFAUL
     data = query.data
 
     if data.startswith("join"):
-        USER_ID_TO_NAME[update.effective_user.id] = update.effective_user.full_name
+        name_store.set(update.effective_user.id, update.effective_user.full_name)
 
         p1_id = int(data[5:])
         p2_id = update.effective_user.id
@@ -83,8 +101,8 @@ async def callback_query_handler(update: Update, context: CallbackContext.DEFAUL
     await query.answer()
 
     header = [
-        f"{BLUE_EMOJI} {USER_ID_TO_NAME[game.player_ids[0]]}",
-        f"{RED_EMOJI} {USER_ID_TO_NAME[game.player_ids[1]]}"
+        f"{BLUE_EMOJI} {name_store.get(game.player_ids[0])}",
+        f"{RED_EMOJI} {name_store.get(game.player_ids[1])}"
     ]
 
     res = game.check_result()
@@ -116,11 +134,16 @@ async def callback_query_handler(update: Update, context: CallbackContext.DEFAUL
 
 
 def main():
-    application = ApplicationBuilder().token(os.environ["TOKEN"]).build()
+    application = ApplicationBuilder().token(os.environ["TOKEN"]).defaults(
+        Defaults(parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    ).build()
     application.add_handler(CommandHandler("start", cmd_start))
+    application.add_handler(CommandHandler("help", cmd_help))
+    application.add_handler(CommandHandler("ping", cmd_ping))
     application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(CallbackQueryHandler(callback_query_handler))
     application.run_polling()
+    name_store.save()
 
 
 if __name__ == "__main__":
