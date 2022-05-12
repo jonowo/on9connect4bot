@@ -1,5 +1,7 @@
 import itertools
 
+from constants import BLUE_EMOJI, RED_EMOJI, WHITE_EMOJI
+
 
 class Game:
     ROWS = 6
@@ -9,6 +11,14 @@ class Game:
         self.player_ids = [p1_id, p2_id]
         self.board = board
         self.turn = (Game.ROWS * Game.COLS - tuple(itertools.chain(*board)).count(0)) % 2
+
+    def __str__(self) -> str:
+        emojis = [WHITE_EMOJI, BLUE_EMOJI, RED_EMOJI]
+        text = [[""] * Game.COLS for _ in range(Game.ROWS)]
+        for i in range(Game.ROWS):
+            for j in range(Game.COLS):
+                text[i][j] = emojis[self.board[i][j]]
+        return "\n".join("".join(row) for row in text)
 
     def make_move(self, col: int) -> None:
         for row in range(Game.ROWS - 1, -1, -1):
@@ -69,10 +79,15 @@ class Game:
         p1_id, p2_id, state = data.split(":")
 
         rows = [int(i) for i in state.split(",")]
-        board = [[0] * Game.COLS for _ in range(6)]
+        board = [[0] * Game.COLS for _ in range(Game.ROWS)]
         for i in range(Game.ROWS):
             for j in range(Game.COLS):
                 board[i][j] = rows[i] % 3
                 rows[i] //= 3
 
         return cls(int(p1_id), int(p2_id), board)
+
+    @classmethod
+    def create(cls, p1_id: int, p2_id: int) -> "Game":
+        board = [[0] * Game.COLS for _ in range(Game.ROWS)]
+        return cls(p1_id, p2_id, board)
