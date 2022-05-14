@@ -3,3 +3,4 @@ RED_EMOJI = "\U0001f534"
 WHITE_EMOJI = "\u2b1c\ufe0f"
 TROPHY_EMOJI = "\U0001f3c6"
 HANDSHAKE_EMOJI = "\U0001f91d"
+NUMBERS_EMOJI = "".join(f"{i}\ufe0f\u20e3" for i in range(1, 8))

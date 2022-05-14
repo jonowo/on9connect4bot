@@ -1,6 +1,6 @@
 import itertools
 
-from .constants import BLUE_EMOJI, RED_EMOJI, WHITE_EMOJI
+from .constants import BLUE_EMOJI, NUMBERS_EMOJI, RED_EMOJI, WHITE_EMOJI
 
 
 class Game:
@@ -18,7 +18,7 @@ class Game:
         for i in range(Game.ROWS):
             for j in range(Game.COLS):
                 text[i][j] = emojis[self.board[i][j]]
-        return "\n".join("".join(row) for row in text)
+        return "\n".join(["".join(row) for row in text] + [NUMBERS_EMOJI])
 
     def make_move(self, col: int) -> None:
         for row in range(Game.ROWS - 1, -1, -1):
