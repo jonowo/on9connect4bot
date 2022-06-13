@@ -6,5 +6,6 @@ Python 3.9+ required
 ```bash
 pip install -r requirements.txt
 export TOKEN='Bot token obtained from @BotFather'
+export DEVELOPER_ID='1234567'
 python -m on9connect4bot
 ```

@@ -1,15 +1,17 @@
 import asyncio
+import html
 import logging
 import os
 import time
+import traceback
 from uuid import uuid4
 
 from dotenv import load_dotenv
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle,
                       InputTextMessageContent, Update)
 from telegram.constants import ParseMode
-from telegram.ext import (ApplicationBuilder, CallbackContext, CallbackQueryHandler,
-                          CommandHandler, Defaults, InlineQueryHandler)
+from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
+                          CommandHandler, ContextTypes, Defaults, InlineQueryHandler)
 
 from .constants import BLUE_EMOJI, HANDSHAKE_EMOJI, RED_EMOJI, TROPHY_EMOJI
 from .game import Game
@@ -19,12 +21,13 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
 load_dotenv()
-name_store = NameStore("../name_store.json")
+name_store = NameStore("name_store.json")
 
 
-async def cmd_start(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Hi! Start a game of Connect 4 with a friend.",
         reply_markup=InlineKeyboardMarkup.from_button(
@@ -33,7 +36,7 @@ async def cmd_start(update: Update, context: CallbackContext.DEFAULT_TYPE) -> No
     )
 
 
-async def cmd_help(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Start a game by typing my name <code>@on9connect4bot</code> in any chat.\n\n"
         "Contact my owner <a href='tg://user?id=463998526'>Jono</a> to report bugs.\n"
@@ -41,13 +44,13 @@ async def cmd_help(update: Update, context: CallbackContext.DEFAULT_TYPE) -> Non
     )
 
 
-async def cmd_ping(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+async def cmd_ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     t = time.time()
     msg = await update.message.reply_text("Pong!")
     await msg.edit_text(f"Pong! <code>{time.time() - t:.3f}s</code>")
 
 
-async def inline_query_handler(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     name_store.set(update.effective_user.id, update.effective_user.full_name)
     results = [
         InlineQueryResultArticle(
@@ -68,7 +71,7 @@ async def inline_query_handler(update: Update, context: CallbackContext.DEFAULT_
     await update.inline_query.answer(results, is_personal=True)
 
 
-async def callback_query_handler(update: Update, context: CallbackContext.DEFAULT_TYPE) -> None:
+async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     data = query.data
 
@@ -135,6 +138,18 @@ async def callback_query_handler(update: Update, context: CallbackContext.DEFAUL
     )
 
 
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error("Exception while handling an update:", exc_info=context.error)
+
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    message = (
+        "An exception was raised while handling an update:\n"
+        f"<pre>{html.escape(tb_string)}</pre>"
+    )
+    await context.bot.send_message(int(os.environ["DEVELOPER_ID"]), message, parse_mode=ParseMode.HTML)
+
+
 def main():
     application = ApplicationBuilder().token(os.environ["TOKEN"]).defaults(
         Defaults(parse_mode=ParseMode.HTML, disable_web_page_preview=True)
@@ -144,6 +159,7 @@ def main():
     application.add_handler(CommandHandler("ping", cmd_ping))
     application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(CallbackQueryHandler(callback_query_handler))
+    application.add_error_handler(error_handler)
     application.run_polling()
     name_store.save()
 
